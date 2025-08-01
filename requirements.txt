@@ -5,3 +5,4 @@ psycopg2-binary
 flask
 flask-mail
 stripe
+beautifulsoup4
