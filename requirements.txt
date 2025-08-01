@@ -1,0 +1,7 @@
+selenium
+webdriver-manager
+python-dotenv
+psycopg2-binary
+flask
+flask-mail
+stripe
