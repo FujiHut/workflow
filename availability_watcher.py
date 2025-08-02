@@ -1,4 +1,3 @@
-
 import os
 import time
 import psycopg2
@@ -19,7 +18,11 @@ from selenium.webdriver.support import expected_conditions as EC
 load_dotenv()
 EMAIL_FROM = os.getenv("EMAIL_FROM")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
-DB_URL = os.getenv("DATABASE_URL")
+
+DB_HOST = os.getenv("DB_HOST")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 HUT_URLS = {
     "kamaiwakan": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/vP9OM",
@@ -33,28 +36,30 @@ HUT_URLS = {
     "fuji_mountain_guides": "https://www.fujimountainguides.com/two-day-mt-fuji-tour.html"
 }
 
+# Selenium setup
 options = Options()
 options.add_argument("--headless")
 options.add_argument("--disable-gpu")
+
 try:
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     def fetch_availability_kamaiwakan(driver, date_iso):
-        print("🧪 Simulating Kamaiwakan availability for", date_iso)
+        print("🔍 Simulating Kamaiwakan availability for", date_iso)
         return date_iso == "2025-07-14"
 
     def fetch_availability_fuji_mountain_guides(driver, date_iso):
-        print("🧪 Simulating Fuji Mountain Guides availability for", date_iso)
+        print("🔍 Simulating Fuji Mountain Guides availability for", date_iso)
         return date_iso == "2025-07-14"
 
     def fetch_availability(hut_url, date_iso):
-        print("🧪 Simulating availability for", hut_url, date_iso)
+        print("🔍 Simulating availability for", hut_url, date_iso)
         return date_iso == "2025-07-14"
 
     def send_email(to_email, hut, found_dates):
-        subject = "⛺ {} Availability Alert".format(hut.replace("_", " ").title())
+        subject = f"⛺ {hut.replace('_', ' ').title()} Availability Alert"
         body = "Hello,\n\n"
-        body += "The following dates are now available for {}:\n\n".format(hut.replace("_", " ").title())
+        body += f"The following dates are now available for {hut.replace('_', ' ').title()}:\n\n"
         body += "\n".join(found_dates)
         body += "\n\nBook ASAP to secure your spot!"
         msg = MIMEText(body)
@@ -65,20 +70,26 @@ try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(EMAIL_FROM, EMAIL_PASS)
             server.send_message(msg)
-            print("✅ Alert sent to {} for {}: {}".format(to_email, hut, found_dates))
+            print(f"✅ Alert sent to {to_email} for {hut}: {found_dates}")
 
     def main():
-        conn = psycopg2.connect(DB_URL)
+        conn = psycopg2.connect(
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            host=DB_HOST,
+            sslmode="require"
+        )
         cur = conn.cursor()
         cur.execute("SELECT email, hut, start_date, end_date FROM subscriptions")
         subs = cur.fetchall()
-        print("🔍 Found {} subscriptions".format(len(subs)))
+        print(f"🔎 Found {len(subs)} subscriptions")
 
         for email, hut, start_date, end_date in subs:
-            print("➡️  Checking for {}, hut: {}, from {} to {}".format(email, hut, start_date, end_date))
+            print(f"➡️  Checking for {email}, hut: {hut}, from {start_date} to {end_date}")
             hut_url = HUT_URLS.get(hut)
             if not hut_url:
-                print("⚠️ No URL for hut: {}, skipping.".format(hut))
+                print(f"⚠️  No URL for hut: {hut}, skipping.")
                 continue
 
             current = start_date
@@ -102,12 +113,13 @@ try:
             if matches:
                 send_email(email, hut, matches)
             else:
-                print("❌ No availability found for {}".format(email))
+                print(f"❌ No availability found for {email}")
 
         cur.close()
         conn.close()
+
 finally:
     driver.quit()
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()
