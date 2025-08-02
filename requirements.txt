@@ -1,5 +1,4 @@
 selenium==4.21.0
-webdriver-manager==4.0.1
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
 flask==2.3.3
