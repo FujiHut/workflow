@@ -3,9 +3,7 @@ import time
 import psycopg2
 from datetime import datetime, timedelta
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 import smtplib
@@ -42,7 +40,7 @@ options.add_argument("--headless")
 options.add_argument("--disable-gpu")
 
 try:
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver = webdriver.Chrome(options=options)
 
     def fetch_availability_kamaiwakan(driver, date_iso):
         print("🔍 Simulating Kamaiwakan availability for", date_iso)
