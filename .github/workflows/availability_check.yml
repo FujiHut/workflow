@@ -1,4 +1,3 @@
-
 name: Mount Fuji Availability Watcher
 
 on:
@@ -11,10 +10,12 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      EMAIL_USER: ${{ secrets.EMAIL_USER }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
       EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-      STRIPE_KEY: ${{ secrets.STRIPE_KEY }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_HOST: ${{ secrets.DB_HOST }}
 
     steps:
       - name: Checkout repository
