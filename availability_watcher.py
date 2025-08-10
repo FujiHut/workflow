@@ -18,6 +18,18 @@ load_dotenv()
 EMAIL_FROM = os.getenv("EMAIL_FROM")
 EMAIL_PASS = os.getenv("EMAIL_PASS")
 DB_URL = os.getenv("DATABASE_URL")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+
+conn = psycopg2.connect(
+    dbname=DB_NAME,
+    user=DB_USER,
+    password=DB_PASSWORD,
+    host=DB_HOST,
+    sslmode="require"
+)
 
 HUT_URLS = {
     "kamaiwakan": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/vP9OM",
