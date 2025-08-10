@@ -5,3 +5,4 @@ flask==2.3.3
 flask-mail==0.9.1
 stripe==9.8.0
 beautifulsoup4==4.12.3
+webdriver-manager
