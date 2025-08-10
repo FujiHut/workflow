@@ -9,9 +9,30 @@ from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 import smtplib
 from dotenv import load_dotenv
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+
+# Load environment variables
+load_dotenv()
+
+# Chrome options for headless mode (GitHub Actions safe)
+options = Options()
+options.add_argument("--headless=new")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+
+# Use GitHub Actions Chrome if running in Actions, else local webdriver_manager
+if os.getenv("GITHUB_ACTIONS"):
+    service = Service("/usr/bin/chromedriver")
+else:
+    from webdriver_manager.chrome import ChromeDriverManager
+    service = Service(ChromeDriverManager().install())
+
+driver = webdriver.Chrome(service=service, options=options)
 
 # Load environment variables
 load_dotenv()
