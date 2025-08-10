@@ -101,7 +101,12 @@ def send_email(to_email, hut, found_dates):
         print(f"✅ Alert sent to {to_email} for {hut}: {found_dates}")
 
 def main():
-    conn = psycopg2.connect(DB_URL, sslmode="require")
+    conn = psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        sslmode="require")
     cur = conn.cursor()
     cur.execute("SELECT email, hut, start_date, end_date FROM subscriptions")
     subs = cur.fetchall()
