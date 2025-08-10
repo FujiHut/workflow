@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r workflow/requirements.txt
+          pip install -r requirements.txt
 
       - name: Set up headless Chrome
         uses: browser-actions/setup-chrome@v1
