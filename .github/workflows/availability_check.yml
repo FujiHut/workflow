@@ -16,7 +16,7 @@ jobs:
       DB_USER: ${{ secrets.DB_USER }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       DB_HOST: ${{ secrets.DB_HOST }}
-      GITHUB_ACTIONS: true   # This will trigger the Chrome path in your script
+      GITHUB_ACTIONS: true   # let script know we're inside GitHub Actions
 
     steps:
       - name: Checkout repository
