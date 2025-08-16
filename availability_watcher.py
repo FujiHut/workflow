@@ -8,30 +8,9 @@ from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 import smtplib
 from dotenv import load_dotenv
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
-# Load environment variables
-load_dotenv()
-
-# Chrome options for headless mode (GitHub Actions safe)
-options = Options()
-options.add_argument("--headless=new")
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
-
-# Use GitHub Actions Chrome if running in Actions, else local webdriver_manager
-if os.getenv("GITHUB_ACTIONS"):
-    service = Service("/usr/bin/chromedriver")
-else:
-    from webdriver_manager.chrome import ChromeDriverManager
-    service = Service(ChromeDriverManager().install())
-
-driver = webdriver.Chrome(service=service, options=options)
 
 # Load environment variables
 load_dotenv()
@@ -41,14 +20,6 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
-
-conn = psycopg2.connect(
-    dbname=DB_NAME,
-    user=DB_USER,
-    password=DB_PASSWORD,
-    host=DB_HOST,
-    sslmode="require"
-)
 
 HUT_URLS = {
     "kamaiwakan": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/vP9OM",
@@ -62,54 +33,27 @@ HUT_URLS = {
     "fuji_mountain_guides": "https://www.fujimountainguides.com/two-day-mt-fuji-tour.html"
 }
 
-# Configure Chrome for headless mode
+# Configure Chrome options
 options = Options()
-options.add_argument("--headless=new")
+options.add_argument("--headless")
 options.add_argument("--disable-gpu")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-def fetch_availability(hut_url, date_iso):
-    """Check live availability for given hut and date on Peek."""
-    driver.get(hut_url)
+# ✅ Different setup depending on environment
+if os.getenv("GITHUB_ACTIONS"):  # Running inside GitHub Actions
+    driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=options)
+else:  # Local dev
+    from webdriver_manager.chrome import ChromeDriverManager
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-    try:
-        # Wait until calendar loads
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="CalendarDay"]'))
-        )
-
-        # Format target date as "Aug 30"
-        target = datetime.strptime(date_iso, "%Y-%m-%d")
-        short_date = target.strftime("%b %-d").replace(" 0", " ")
-
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-
-        # Dates with "aria-label" = "Select Aug 30"
-        day_labels = soup.select('[aria-label^="Select "]')
-
-        for label in day_labels:
-            if short_date in label['aria-label']:
-                return True
-
-    except Exception as e:
-        print(f"⚠️ Error checking {hut_url}: {e}")
-
-    return False
-
-def fetch_availability_kamaiwakan(driver, date_iso):
-    return fetch_availability(HUT_URLS["kamaiwakan"], date_iso)
-
-def fetch_availability_fuji_mountain_guides(driver, date_iso):
-    return fetch_availability(HUT_URLS["fuji_mountain_guides"], date_iso)
 
 def send_email(to_email, hut, found_dates):
-    subject = f"🏔 {hut.replace('_', ' ').title()} Availability Alert"
-    body = f"Hello,\n\nThe following dates are now available for {hut.replace('_', ' ').title()}:\n\n"
+    subject = "⛺ {} Availability Alert".format(hut.replace("_", " ").title())
+    body = "Hello,\n\n"
+    body += "The following dates are now available for {}:\n\n".format(hut.replace("_", " ").title())
     body += "\n".join(found_dates)
     body += "\n\nBook ASAP to secure your spot!"
-
     msg = MIMEText(body)
     msg["Subject"] = subject
     msg["From"] = EMAIL_FROM
@@ -118,7 +62,24 @@ def send_email(to_email, hut, found_dates):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(EMAIL_FROM, EMAIL_PASS)
         server.send_message(msg)
-        print(f"✅ Alert sent to {to_email} for {hut}: {found_dates}")
+        print("✅ Alert sent to {} for {}: {}".format(to_email, hut, found_dates))
+
+
+def check_availability(hut, hut_url, date_iso):
+    try:
+        driver.get(hut_url)
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div"))
+        )
+        page = driver.page_source
+        soup = BeautifulSoup(page, "html.parser")
+
+        # Look for date text on the page
+        return date_iso in soup.get_text()
+    except Exception as e:
+        print(f"⚠️ Error checking {hut_url}: {e}")
+        return False
+
 
 def main():
     conn = psycopg2.connect(
@@ -126,11 +87,12 @@ def main():
         user=DB_USER,
         password=DB_PASSWORD,
         host=DB_HOST,
-        sslmode="require")
+        sslmode="require"
+    )
     cur = conn.cursor()
     cur.execute("SELECT email, hut, start_date, end_date FROM subscriptions")
     subs = cur.fetchall()
-    print(f"🔍 Found {len(subs)} subscriptions")
+    print("🔍 Found {} subscriptions".format(len(subs)))
 
     for email, hut, start_date, end_date in subs:
         print(f"➡️ Checking for {email}, hut: {hut}, from {start_date} to {end_date}")
@@ -144,26 +106,20 @@ def main():
 
         while current <= end_date:
             iso = current.strftime("%Y-%m-%d")
-            print(f"  📅 Checking {iso}")
+            print("  📅 Checking", iso)
 
-            if hut == "kamaiwakan":
-                if fetch_availability_kamaiwakan(driver, iso):
-                    matches.append(iso)
-            elif hut == "fuji_mountain_guides":
-                if fetch_availability_fuji_mountain_guides(driver, iso):
-                    matches.append(iso)
-            else:
-                if fetch_availability(hut_url, iso):
-                    matches.append(iso)
+            if check_availability(hut, hut_url, iso):
+                matches.append(iso)
             current += timedelta(days=1)
 
         if matches:
             send_email(email, hut, matches)
         else:
-            print(f"❌ No availability found for {email}")
+            print("❌ No availability found for {}".format(email))
 
     cur.close()
     conn.close()
+
 
 if __name__ == "__main__":
     try:
