@@ -19,6 +19,14 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 
+# --- AUTH HEADER for Peek API ---
+HEADERS = {
+    "Authorization": "Key 9846cbab-98f5-477d-b7d1-1ab5928778ff",
+    "Accept": "application/vnd.api+json",
+    "Content-Type": "application/vnd.api+json",
+    "User-Agent": "Mozilla/5.0"
+}
+
 HUTS = {
     # KAMAIWAKAN — 6 separate room types (replace with your real IDs)
     "kamaiwakan": {
