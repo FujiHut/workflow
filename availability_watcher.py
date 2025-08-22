@@ -79,20 +79,6 @@ HUTS = {
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/dy9Me",
     },
 
-    # SETOKAN — ✅ real IDs provided by you (6 options)
-    "setokan": {
-        "activity_id": "ce658958-2895-4b71-abec-6fb1d2097fc7",
-        "ticket_ids": [
-            "1d48dd2a-8ca1-4239-9227-411e31df7478",
-            "fd0e3a15-c08b-4eef-952d-5c10a94f7a73",
-            "94d31719-dd8b-43a7-8d11-03272a6a29a9",
-            "cc7e83bd-e780-49a1-b410-865c438466b5",
-            "468ec616-88f7-423a-a51c-a4d6711d6c6e",
-            "8b3684fb-b909-411f-95ba-89d2d18948ab",
-        ],
-        "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_9bn546--ce658958-2895-4b71-abec-6fb1d2097fc7?mode=standalone",
-    },
-
     "yoshinoya": {
         "activity_id": "299d662c-33d7-46d0-99b0-4f5dbb991690",
         "ticket_ids": [
