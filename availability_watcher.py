@@ -19,20 +19,16 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 
-# --- AUTH HEADER for Peek API ---
-HEADERS = {
-    "Authorization": "Key 9846cbab-98f5-477d-b7d1-1ab5928778ff",
-    "Accept": "application/vnd.api+json",
-    "Content-Type": "application/vnd.api+json",
-    "User-Agent": "Mozilla/5.0"
-}
+PEEK_API_KEY = "9846cbab-98f5-477d-b7d1-1ab5928778ff"
+PEEK_BASE = "https://book.peek.com/services/api"
 
+# ==============================
+# Huts Configuration (with activity/ticket IDs)
+# ==============================
 HUTS = {
-    # KAMAIWAKAN — 6 separate room types (replace with your real IDs)
     "kamaiwakan": {
         "activity_id": "7d7d64c6-f3e8-44a9-a214-76c938db3a8f",
         "ticket_ids": [
-            # Paste all 6 ticket_ids you extracted for Kamaiwakan
             "7c1d9a26-b6f0-4e39-b2fb-f0f6b6a9a8f1",
             "64f74c28-9ad3-4657-b2f4-b3e511e2aa26",
             "efc7c58c-83fa-4b54-9860-16c02172df87",
@@ -56,64 +52,40 @@ HUTS = {
     },
     "taiyokan": {
         "activity_id": "c13b9a91-6a32-4e3e-905a-3c2f26df9f72",
-        "ticket_ids": [
-            # Add all ticket_ids you saw in the JSON
-            "ef97a7a5-98d5-49f0-aef0-4e1939b3bca3",
-        ],
+        "ticket_ids": ["ef97a7a5-98d5-49f0-aef0-4e1939b3bca3"],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/ZYLbB",
     },
-
     "miharashikan": {
         "activity_id": "82acdcf2-56f3-4934-8f0b-3e12f4d2781c",
-        "ticket_ids": [
-            "27e3a4f0-b199-4cf3-a4de-c9163f69a9d9",
-        ],
+        "ticket_ids": ["27e3a4f0-b199-4cf3-a4de-c9163f69a9d9"],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_y83bej--a732d212-bdb2-49c9-afee-3cb1a8b7c6b7?mode=standalone",
     },
-
     "yamaguchiya": {
         "activity_id": "f41201c6-2b4f-4d2a-b927-93a2c65a8221",
-        "ticket_ids": [
-            "a81399f2-7881-44a3-b9d7-c8cba34e52ac",
-          ],
+        "ticket_ids": ["a81399f2-7881-44a3-b9d7-c8cba34e52ac"],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/dy9Me",
     },
-
     "yoshinoya": {
         "activity_id": "299d662c-33d7-46d0-99b0-4f5dbb991690",
-        "ticket_ids": [
-            "ba1b80f7-6a4f-4e47-92a3-9dbd9e9c8e15",
-        ],
+        "ticket_ids": ["ba1b80f7-6a4f-4e47-92a3-9dbd9e9c8e15"],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/l7Wve",
     },
-
     "osada_sanso": {
         "activity_id": "299d662c-33d7-46d0-99b0-4f5dbb991690",
-        "ticket_ids": [
-            "ba1b80f7-6a4f-4e47-92a3-9dbd9e9c8e15",
-        ],
+        "ticket_ids": ["ba1b80f7-6a4f-4e47-92a3-9dbd9e9c8e15"],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/rb3b4",
     },
-
     "higashi_fuji_sanso": {
         "activity_id": "13c7a6aa-26f0-4726-a0ab-2c799de0f1d4",
-        "ticket_ids": [
-            "7e8f2d40-6d88-4e24-a0b8-17d9e637b631",
-        ],
+        "ticket_ids": ["7e8f2d40-6d88-4e24-a0b8-17d9e637b631"],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/8aMap",
     },
 }
 
-# NOTE: fuji_mountain_guides intentionally removed.
-
-PEEK_BASE = "https://book.peek.com/services/api"
-
-
 # ==============================
-# HTTP Session & Headers
+# Helpers
 # ==============================
 def base_headers(referer: str) -> dict:
-    # Browser-y headers. Keep Referer exact to the booking page for this hut.
     return {
         "Accept": "application/vnd.api+json, application/json;q=0.9, */*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
@@ -122,135 +94,82 @@ def base_headers(referer: str) -> dict:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
         ),
-        "Referer": referer or "https://book.peek.com/",
+        "Referer": referer,
         "Origin": "https://book.peek.com",
         "Connection": "keep-alive",
         "X-Requested-With": "XMLHttpRequest",
-        # "Content-Type" not needed for GET
+        "Authorization": f"Key {PEEK_API_KEY}",
     }
 
 def warm_up_session(session: requests.Session, referer: str):
-    """
-    Load the booking page to set same-origin cookies (prevents 401).
-    """
     try:
         r = session.get(
             referer,
-            headers={
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/124.0.0.0 Safari/537.36"
-                ),
-                "Referer": "https://book.peek.com/",
-                "Connection": "keep-alive",
-            },
+            headers={"User-Agent": "Mozilla/5.0"},
             timeout=20,
             allow_redirects=True,
         )
-        # A short pause helps when CF or app sets cookies asynchronously
         time.sleep(0.5)
         return r.status_code
     except Exception as e:
-        print(f"   ⚠️ Warm-up failed for referer: {referer}: {e}")
+        print(f"⚠️ Warm-up failed for {referer}: {e}")
         return None
 
 def build_times_url(date_iso: str) -> str:
     return f"{PEEK_BASE}/availability-dates/{date_iso}/availability-times"
 
 def query_day(session: requests.Session, hut_key: str, date_iso: str):
-    """
-    Query Peek for this hut/date.
-    Tries with src_booking_refid first, then without if 401.
-    Returns dict: {ok: bool, available: [(time, spots), ...]} OR {ok: False, error: "..."}
-    """
     cfg = HUTS[hut_key]
     activity_id = cfg["activity_id"]
     ticket_ids = cfg["ticket_ids"]
     referer = cfg["referer"]
 
-    # Warm up the session to get cookies
     warm_up_session(session, referer)
 
     def call_api(include_refid: bool):
         params = [("activity_id", activity_id)]
         if include_refid:
-            # stable per run is fine
             params.append(("src_booking_refid", SESSION_REFID))
-        # include ALL tickets with quantity=1 (we just need availability)
         for i, tid in enumerate(ticket_ids):
             params.append((f"tickets[{i}][quantity]", "1"))
             params.append((f"tickets[{i}][ticket_id]", tid))
-
         url = build_times_url(date_iso)
-        resp = session.get(url, headers=base_headers(referer), params=params, timeout=25)
-        return resp
+        return session.get(url, headers=base_headers(referer), params=params, timeout=25)
 
-    # 1) Try with src_booking_refid
     resp = call_api(include_refid=True)
-
-    # If 401, try without src_booking_refid (some experiences require none)
     if resp.status_code == 401:
-        # Re-warm the session (sometimes needed for certain huts) then retry
         warm_up_session(session, referer)
         resp = call_api(include_refid=False)
 
+    time.sleep(0.5)  # prevent throttling
+
     if resp.status_code != 200:
-        preview = (resp.text or "")[:160].replace("\n", " ")
-        return {
-            "ok": False,
-            "error": f"Status {resp.status_code} for {hut_key} on {date_iso} — {preview}",
-        }
+        return {"ok": False, "error": f"Status {resp.status_code} for {hut_key} on {date_iso} — {resp.text[:150]}"}
 
     try:
         payload = resp.json()
-    except Exception:
-        preview = (resp.text or "")[:160].replace("\n", " ")
-        return {"ok": False, "error": f"Non-JSON for {hut_key} on {date_iso} — {preview}"}
+    except:
+        return {"ok": False, "error": f"Non-JSON for {hut_key} on {date_iso}"}
 
-    data = payload.get("data") or []
     found = []
-    for item in data:
-        attrs = item.get("attributes") or {}
-        mode = attrs.get("availability-mode")
-        availability = attrs.get("availability") or []
-        # Accept "available" as signal and add up any spots we can see
-        if mode == "available":
-            total = 0
-            for opt in availability:
-                try:
-                    total += int(opt.get("spots_left", 0) or 0)
-                except Exception:
-                    pass
-            if total <= 0:
-                try:
-                    total = int(attrs.get("spots", 0) or 0)
-                except Exception:
-                    pass
-            if total > 0:
-                found.append((attrs.get("time") or "", total))
+    for item in payload.get("data", []):
+        attrs = item.get("attributes", {})
+        if attrs.get("availability-mode") == "available":
+            total_spots = sum(int(opt.get("spots_left", 0) or 0) for opt in attrs.get("availability", []))
+            if total_spots <= 0:
+                total_spots = int(attrs.get("spots", 0) or 0)
+            if total_spots > 0:
+                found.append((attrs.get("time", ""), total_spots))
 
     return {"ok": True, "available": found}
 
 def send_email(to_email: str, hut_key: str, found_dates):
     subject = f"⛺ {hut_key.replace('_', ' ').title()} — Availability Alert"
-    lines = [
-        "Hello,",
-        "",
-        f"The following dates have availability for {hut_key.replace('_', ' ').title()}:",
-        "",
-    ]
+    body = "Hello,\n\nThe following dates are now available:\n\n"
     for date_iso, slots in found_dates:
-        if slots:
-            time_s = ", ".join([f"{t} ({s} spot{'s' if s!=1 else ''})" for t, s in slots])
-            lines.append(f"  • {date_iso}: {time_s}")
-        else:
-            lines.append(f"  • {date_iso}: available (spots shown at checkout)")
-    lines += ["", "Book ASAP to secure your spot!"]
-    body = "\n".join(lines)
-
+        slot_text = ", ".join([f"{t} ({s} spot{'s' if s != 1 else ''})" for t, s in slots])
+        body += f"- {date_iso}: {slot_text}\n"
+    body += "\nBook ASAP!"
     msg = MIMEText(body)
     msg["Subject"] = subject
     msg["From"] = EMAIL_FROM
@@ -265,14 +184,6 @@ def send_email(to_email: str, hut_key: str, found_dates):
 # Main
 # ==============================
 def main():
-    missing = [
-        k for k, cfg in HUTS.items()
-        if not cfg.get("activity_id") or not cfg.get("ticket_ids") or "REPLACE_ME" in cfg.get("activity_id", "") \
-           or any("REPLACE_ME" in t for t in cfg.get("ticket_ids", []))
-    ]
-    if missing:
-        print("⚠️ These huts are missing real IDs and will be skipped:", ", ".join(missing))
-
     conn = psycopg2.connect(
         dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, sslmode="require"
     )
@@ -282,14 +193,9 @@ def main():
     print(f"🔍 Found {len(subs)} subscriptions")
 
     session = requests.Session()
-
     for email, hut_key, start_date, end_date in subs:
         if hut_key not in HUTS:
-            print(f"⚠️ Hut '{hut_key}' not configured. Skipping {email}.")
-            continue
-        cfg = HUTS[hut_key]
-        if hut_key in missing:
-            print(f"⚠️ Skipping {email} — IDs not set for '{hut_key}'.")
+            print(f"⚠️ Hut '{hut_key}' not configured, skipping {email}.")
             continue
 
         print(f"➡️ Checking {email}, hut: {hut_key}, from {start_date} to {end_date}")
@@ -300,24 +206,23 @@ def main():
             iso = d.strftime("%Y-%m-%d")
             result = query_day(session, hut_key, iso)
             if not result.get("ok"):
-                print(f"   ⚠️ {iso}: {result.get('error')}")
+                print(f"⚠️ {iso}: {result.get('error')}")
             else:
-                avail = result.get("available") or []
+                avail = result.get("available", [])
                 if avail:
                     matches.append((iso, avail))
                 else:
-                    print(f"   ❌ {iso}: no spots")
+                    print(f"❌ {iso}: no spots")
             d += timedelta(days=1)
 
         if matches:
             send_email(email, hut_key, matches)
         else:
-            print(f"❌ No availability for {email} on requested dates")
+            print(f"❌ No availability for {email}")
 
     cur.close()
     conn.close()
 
-# Stable per-run booking refid (some huts behave better with a consistent value)
 SESSION_REFID = str(uuid.uuid4())
 
 if __name__ == "__main__":
