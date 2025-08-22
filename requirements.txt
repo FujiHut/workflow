@@ -1,7 +1,5 @@
-selenium==4.21.0
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
 flask==2.3.3
 flask-mail==0.9.1
 stripe==9.8.0
-beautifulsoup4==4.12.3
