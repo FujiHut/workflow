@@ -22,45 +22,41 @@ DB_HOST = os.getenv("DB_HOST")
 HUTS = {
     # KAMAIWAKAN — 6 separate room types (replace with your real IDs)
     "kamaiwakan": {
-        "activity_id": "REPLACE_ME_KAMAIWAKAN_ACTIVITY",
+        "activity_id": "7d7d64c6-f3e8-44a9-a214-76c938db3a8f",
         "ticket_ids": [
             # Paste all 6 ticket_ids you extracted for Kamaiwakan
-            "REPLACE_ME_TICKET_ID_1",
-            "REPLACE_ME_TICKET_ID_2",
-            "REPLACE_ME_TICKET_ID_3",
-            "REPLACE_ME_TICKET_ID_4",
-            "REPLACE_ME_TICKET_ID_5",
-            "REPLACE_ME_TICKET_ID_6",
+            "7c1d9a26-b6f0-4e39-b2fb-f0f6b6a9a8f1",
+            "64f74c28-9ad3-4657-b2f4-b3e511e2aa26",
+            "efc7c58c-83fa-4b54-9860-16c02172df87",
+            "0e7b6b5e-f31d-4b24-9f2f-d1a6c6634a7e",
+            "9c2bfa3f-7c26-4e7c-b35c-fb6a87d7f731",
+            "bdc1c9d7-29af-4621-a927-6f9638ac9321",
         ],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/vP9OM",
     },
 
     "taiyokan": {
-        "activity_id": "REPLACE_ME_TAIYOKAN_ACTIVITY",
+        "activity_id": "c13b9a91-6a32-4e3e-905a-3c2f26df9f72",
         "ticket_ids": [
             # Add all ticket_ids you saw in the JSON
-            "REPLACE_ME_TICKET_ID_1",
-            "REPLACE_ME_TICKET_ID_2",
-            # ...
+            "ef97a7a5-98d5-49f0-aef0-4e1939b3bca3",
         ],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/ZYLbB",
     },
 
     "miharashikan": {
-        "activity_id": "REPLACE_ME_MIHARASHIKAN_ACTIVITY",
+        "activity_id": "82acdcf2-56f3-4934-8f0b-3e12f4d2781c",
         "ticket_ids": [
-            "REPLACE_ME_TICKET_ID_1",
-            # ...
+            "27e3a4f0-b199-4cf3-a4de-c9163f69a9d9",
         ],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_y83bej--a732d212-bdb2-49c9-afee-3cb1a8b7c6b7?mode=standalone",
     },
 
     "yamaguchiya": {
-        "activity_id": "REPLACE_ME_YAMAGUCHIYA_ACTIVITY",
+        "activity_id": "f41201c6-2b4f-4d2a-b927-93a2c65a8221",
         "ticket_ids": [
-            "REPLACE_ME_TICKET_ID_1",
-            # ...
-        ],
+            "a81399f2-7881-44a3-b9d7-c8cba34e52ac",
+          ],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/dy9Me",
     },
 
@@ -79,28 +75,25 @@ HUTS = {
     },
 
     "yoshinoya": {
-        "activity_id": "REPLACE_ME_YOSHINOYA_ACTIVITY",
+        "activity_id": "299d662c-33d7-46d0-99b0-4f5dbb991690",
         "ticket_ids": [
-            "REPLACE_ME_TICKET_ID_1",
-            # ...
+            "ba1b80f7-6a4f-4e47-92a3-9dbd9e9c8e15",
         ],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/l7Wve",
     },
 
     "osada_sanso": {
-        "activity_id": "REPLACE_ME_OSADA_ACTIVITY",
+        "activity_id": "299d662c-33d7-46d0-99b0-4f5dbb991690",
         "ticket_ids": [
-            "REPLACE_ME_TICKET_ID_1",
-            # ...
+            "ba1b80f7-6a4f-4e47-92a3-9dbd9e9c8e15",
         ],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/rb3b4",
     },
 
     "higashi_fuji_sanso": {
-        "activity_id": "REPLACE_ME_HIGASHI_ACTIVITY",
+        "activity_id": "13c7a6aa-26f0-4726-a0ab-2c799de0f1d4",
         "ticket_ids": [
-            "REPLACE_ME_TICKET_ID_1",
-            # ...
+            "7e8f2d40-6d88-4e24-a0b8-17d9e637b631",
         ],
         "referer": "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/8aMap",
     },
