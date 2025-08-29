@@ -5,3 +5,5 @@ flask-mail==0.9.1
 stripe==9.8.0
 selenium
 psycopg2-binary
+requests
+webdriver-manager
