@@ -2,8 +2,8 @@ name: Mount Fuji Availability Watcher
 
 on:
   schedule:
-    - cron: '0 * * * *'   # Every hour at 00 minutes past the hour
-  workflow_dispatch:       # Manual run
+    - cron: '0 * * * *'   # Every hour
+  workflow_dispatch:
 
 jobs:
   check-availability:
@@ -16,7 +16,7 @@ jobs:
       DB_USER: ${{ secrets.DB_USER }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       DB_HOST: ${{ secrets.DB_HOST }}
-      GITHUB_ACTIONS: true   # let script know we're inside GitHub Actions
+      GITHUB_ACTIONS: true
 
     steps:
       - name: Checkout repository
@@ -39,3 +39,12 @@ jobs:
 
       - name: Run availability watcher
         run: python availability_watcher.py
+
+      - name: Upload latest logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuji-logs
+          path: |
+            availability_log.txt
+            error_log.txt
+          retention-days: 1
