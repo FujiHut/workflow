@@ -1,18 +1,20 @@
 import os
-import time
 import uuid
-from datetime import timedelta
+import time
+from datetime import datetime, timedelta
 import psycopg2
 import smtplib
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
 
+# Selenium imports
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ==============================
@@ -25,6 +27,25 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
+
+# ==============================
+# Log setup
+# ==============================
+LOG_DIR = os.path.dirname(__file__)
+CRASH_LOG_FILE = os.path.join(LOG_DIR, "scraper_crash_log.txt")
+AVAIL_LOG_FILE = os.path.join(LOG_DIR, "availability_log.txt")
+
+def log_scraper(message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(AVAIL_LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {message}\n")
+    print(message)
+
+def log_crash(error_message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(CRASH_LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{timestamp}] {error_message}\n")
+    print(f"❌ {error_message}")
 
 # ==============================
 # Huts Configuration
@@ -48,7 +69,7 @@ HUTS = {
 }
 
 # ==============================
-# Selenium driver setup
+# Selenium driver setup helper
 # ==============================
 def create_driver():
     options = Options()
@@ -60,78 +81,90 @@ def create_driver():
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 # ==============================
-# Navigate calendar to ensure date is visible
+# Scrape full calendar for available dates (with retries)
 # ==============================
-def navigate_to_month(driver, target_date):
-    """Click next/back arrows until the target month is visible"""
-    target_month = target_date.strftime("%B %Y")
-    for _ in range(12):  # max 12 clicks
-        visible_months = driver.find_elements(By.CSS_SELECTOR, ".calendar-header__month")
-        if any(target_month in m.text for m in visible_months):
-            return True
-        # Try clicking "previous month" then "next month"
-        try:
-            next_btn = driver.find_element(By.CSS_SELECTOR, ".calendar-header__next")
-            next_btn.click()
-        except:
-            pass
-        time.sleep(0.5)
-    return False
-
-# ==============================
-# Query day for a hut and room
-# ==============================
-def query_day(driver, url, date_iso):
+def scrape_calendar(url, room_name="Default", max_retries=3):
+    driver = create_driver()
     driver.get(url)
+    
     try:
         WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "[data-app-calendar-month-day]"))
         )
     except:
-        return False
+        log_scraper(f"⚠️ Calendar not loaded for {room_name}")
+        driver.quit()
+        return []
 
-    # Ensure month containing date is visible
-    from datetime import datetime
-    target_date = datetime.strptime(date_iso, "%Y-%m-%d")
-    navigate_to_month(driver, target_date)
+    available_dates = []
+    seen_months = set()
+    retries = 0
 
-    day_elements = driver.find_elements(By.CSS_SELECTOR, "[data-app-calendar-month-day]")
-    for elem in day_elements:
-        day_date = elem.get_attribute("data-app-calendar-month-day")
-        if day_date != date_iso:
-            continue
+    while True:
         try:
-            calendar_day_div = elem.find_element(By.CSS_SELECTOR, "div.calendar-day")
-            classes = calendar_day_div.get_attribute("class")
-            if "has-availability" in classes or "available" in classes.lower():
-                return True
-        except:
-            continue
-    return False
+            day_elements = driver.find_elements(By.CSS_SELECTOR, "[data-app-calendar-month-day]")
+            for elem in day_elements:
+                try:
+                    date_str = elem.get_attribute("data-app-calendar-month-day")
+                    if not date_str:
+                        continue
+                    day_div = elem.find_element(By.CSS_SELECTOR, "div.calendar-day")
+                    classes = day_div.get_attribute("class")
+                    if "has-availability" in classes:
+                        available_dates.append((date_str, room_name))
+                        log_scraper(f"✅ {room_name} {date_str} available")
+                except StaleElementReferenceException:
+                    continue
+                except Exception as e:
+                    log_scraper(f"⚠️ Error reading day {date_str} for {room_name}: {e}")
+
+            month_text = driver.find_element(By.CSS_SELECTOR, ".month-title-text").text.strip()
+            if month_text in seen_months:
+                break
+            seen_months.add(month_text)
+
+            try:
+                next_btn = driver.find_element(By.CSS_SELECTOR, "span.pro-form-icon.pro-icon-position-left")
+                next_btn.click()
+                time.sleep(1)
+            except NoSuchElementException:
+                break
+
+        except StaleElementReferenceException:
+            if retries < max_retries:
+                retries += 1
+                time.sleep(1)
+                continue
+            else:
+                log_scraper(f"⚠️ Too many stale element errors for {room_name}")
+                break
+
+    driver.quit()
+    return available_dates
 
 # ==============================
 # Send aggregated email
 # ==============================
-def send_email(to_email, results):
+def send_email(to_email: str, availability_dict):
     subject = "⛺ Mount Fuji Hut Availability Alert"
-    body = "Hello,\n\nThe following huts have available dates:\n\n"
-    for hut, dates in results.items():
-        body += f"{hut.replace('_', ' ').title()}:\n"
-        for d in dates:
-            body += f"- {d}\n"
-        body += "\n"
-    body += "Book ASAP!"
+    body = "Hello,\n\nThe following dates are now available:\n\n"
+    for hut_key, dates in availability_dict.items():
+        body += f"{hut_key.replace('_', ' ').title()}:\n"
+        for date, room in dates:
+            body += f"  - {date}: {room}\n"
+    body += "\nBook ASAP!"
     msg = MIMEText(body)
     msg["Subject"] = subject
     msg["From"] = EMAIL_FROM
     msg["To"] = to_email
+
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(EMAIL_FROM, EMAIL_PASS)
         server.send_message(msg)
-        print(f"✅ Email sent to {to_email}")
+        log_scraper(f"✅ Email sent to {to_email}")
 
 # ==============================
-# Main logic
+# Main
 # ==============================
 def main():
     conn = psycopg2.connect(
@@ -140,37 +173,51 @@ def main():
     cur = conn.cursor()
     cur.execute("SELECT email, hut, start_date, end_date FROM subscriptions")
     subs = cur.fetchall()
-    print(f"🔍 Found {len(subs)} subscriptions")
+    log_scraper(f"🔍 Found {len(subs)} subscriptions")
 
     for email, hut_key, start_date, end_date in subs:
         if hut_key not in HUTS:
-            print(f"⚠️ Hut '{hut_key}' not configured, skipping {email}")
+            log_scraper(f"⚠️ Hut '{hut_key}' not configured, skipping {email}")
             continue
 
-        print(f"➡️ Checking {email}, hut: {hut_key}")
-        available_dates = []
-        driver = create_driver()
+        availability_dict = {}
+        log_scraper(f"➡️ Checking availability for {email} (hut: {hut_key})")
 
         for room_name, url in HUTS[hut_key]:
-            d = start_date
-            while d <= end_date:
-                iso = d.strftime("%Y-%m-%d")
-                if query_day(driver, url, iso):
-                    available_dates.append(f"{room_name}: {iso}")
-                    print(f"✅ {hut_key} {room_name} {iso} available")
-                d += timedelta(days=1)
+            dates = scrape_calendar(url, room_name)
 
-        driver.quit()
+            # Convert scraped string dates to datetime.date
+            parsed_dates = []
+            for date_str, room in dates:
+                try:
+                    date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                    parsed_dates.append((date_obj, room))
+                except Exception as e:
+                    log_scraper(f"⚠️ Failed to parse date {date_str} for {room_name}: {e}")
 
-        if available_dates:
-            send_email(email, {hut_key: available_dates})
+            # Filter by user date range
+            filtered_dates = [d for d in parsed_dates if start_date <= d[0] <= end_date]
+
+            if filtered_dates:
+                availability_dict.setdefault(hut_key, []).extend(filtered_dates)
+
+        if availability_dict:
+            send_email(email, availability_dict)
         else:
-            print(f"❌ No availability for {email} at {hut_key}")
+            log_scraper(f"❌ No availability for {email}")
 
     cur.close()
     conn.close()
 
+# ==============================
+# Run main with crash logging
+# ==============================
 SESSION_REFID = str(uuid.uuid4())
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        log_crash(error_details)
