@@ -41,7 +41,7 @@ jobs:
         run: python availability_watcher.py
 
       - name: Upload latest logs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: fuji-logs
           path: |
