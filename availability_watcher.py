@@ -195,15 +195,15 @@ def send_email(to_email, hut_name, date):
     try:
         # Build email body with hut URL
         url = next((link for r_name, link in HUTS[hut_name] if r_name == hut_name), "")
-        body = f"""Hello,
+        body = f"""Dear climber,
 
 Good news! A spot has just opened for you at {hut_name} on {date}.
 Secure your spot immediately using this booking link: {url}
 
 Best regards,
-Mount Fuji Hut Alert """
+Mount Fuji Hut Alert"""
         msg = MIMEText(body)
-        msg["Subject"] = f"⛺ Availability alert: {hut_name} on {date}"
+        msg["Subject"] = f"⛺ Fuji Hut Availability Alert: {hut_name} on {date}"
         msg["From"] = EMAIL_FROM
         msg["To"] = to_email
 
@@ -233,7 +233,8 @@ def main():
                 for date_str, room in dates:
                     try:
                         date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-                        if start_date <= date_obj <= end_date:
+                        # ✅ FIX: Make end_date exclusive so only the actual booked night triggers alert
+                        if start_date <= date_obj < end_date:
                             if not has_been_notified(email, hut_key, date_obj):
                                 send_email(email, hut_key, date_obj)
                                 mark_as_notified(email, hut_key, date_obj)
