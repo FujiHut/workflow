@@ -1,4 +1,4 @@
-import os
+import os 
 import uuid
 import time
 from datetime import datetime, timedelta
@@ -36,7 +36,6 @@ LOG_DIR = os.path.dirname(__file__)
 AVAIL_LOG_FILE = os.path.join(LOG_DIR, "availability_log.txt")
 ERROR_LOG_FILE = os.path.join(LOG_DIR, "error_log.txt")
 
-# Remove old log files to keep only latest run
 for f in [AVAIL_LOG_FILE, ERROR_LOG_FILE]:
     if os.path.exists(f):
         os.remove(f)
@@ -160,7 +159,7 @@ def scrape_calendar(url, room_name="Default", max_retries=3):
     return available_dates
 
 # ==============================
-# Database helpers for notified availability
+# Database helpers
 # ==============================
 def get_db_connection():
     return psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST)
@@ -190,12 +189,21 @@ def get_subscriptions():
             return cur.fetchall()
 
 # ==============================
-# Send email for new availability
+# Send email with direct booking links
 # ==============================
 def send_email(to_email, hut_name, date):
     try:
-        msg = MIMEText(f"Good news!\n\nAvailability detected for {hut_name} on {date}.\nBook now to secure your spot!")
-        msg["Subject"] = f"Availability Alert: {hut_name} on {date}"
+        # Build email body with hut URL
+        url = next((link for r_name, link in HUTS[hut_name] if r_name == hut_name), "")
+        body = f"""Hello,
+
+Good news! A spot has just opened for you at {hut_name} on {date}.
+Secure your spot immediately using this booking link: {url}
+
+Best regards,
+Mount Fuji Hut Alert """
+        msg = MIMEText(body)
+        msg["Subject"] = f"⛺ Availability alert: {hut_name} on {date}"
         msg["From"] = EMAIL_FROM
         msg["To"] = to_email
 
@@ -220,26 +228,19 @@ def main():
                 continue
 
             log_avail(f"➡️ Checking availability for {email} ({hut_key})")
-            availability_dict = {}
             for room_name, url in HUTS[hut_key]:
                 dates = scrape_calendar(url, room_name)
-                parsed_dates = []
                 for date_str, room in dates:
                     try:
                         date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
                         if start_date <= date_obj <= end_date:
-                            parsed_dates.append((date_obj, room))
+                            if not has_been_notified(email, hut_key, date_obj):
+                                send_email(email, hut_key, date_obj)
+                                mark_as_notified(email, hut_key, date_obj)
+                            else:
+                                log_avail(f"Already notified {email} for {hut_key} on {date_obj}")
                     except Exception as e:
                         log_avail(f"⚠️ Failed to parse date {date_str} for {room_name}: {e}")
-
-                # Send email only for new availability
-                for date_obj, room in parsed_dates:
-                    if not has_been_notified(email, hut_key, date_obj):
-                        send_email(email, hut_key, date_obj)
-                        mark_as_notified(email, hut_key, date_obj)
-                    else:
-                        log_avail(f"Already notified {email} for {hut_key} on {date_obj}")
-
     except Exception as e:
         import traceback
         log_error(traceback.format_exc())
