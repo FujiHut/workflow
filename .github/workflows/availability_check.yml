@@ -43,8 +43,10 @@ jobs:
       - name: Upload latest logs
         uses: actions/upload-artifact@v4
         with:
-          name: fuji-logs
+          name: fuji-logs            # artifact name
           path: |
             availability_log.txt
             error_log.txt
-          retention-days: 1
+          if-no-files-found: warn     # optional, won't fail workflow if logs are missing
+          retention-days: 1           # keep artifact for 1 day
+          overwrite: true             # overwrite previous artifact with same name
