@@ -6,6 +6,7 @@ import psycopg2
 import smtplib
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
+import logging
 
 # Selenium imports
 from selenium import webdriver
@@ -29,23 +30,42 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 
 # ==============================
-# Log setup
+# Logging setup
 # ==============================
 LOG_DIR = os.path.dirname(__file__)
-CRASH_LOG_FILE = os.path.join(LOG_DIR, "scraper_crash_log.txt")
 AVAIL_LOG_FILE = os.path.join(LOG_DIR, "availability_log.txt")
+ERROR_LOG_FILE = os.path.join(LOG_DIR, "error_log.txt")
 
-def log_scraper(message):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(AVAIL_LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] {message}\n")
-    print(message)
+# Remove old log files to keep only latest run
+for f in [AVAIL_LOG_FILE, ERROR_LOG_FILE]:
+    if os.path.exists(f):
+        os.remove(f)
 
-def log_crash(error_message):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(CRASH_LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"[{timestamp}] {error_message}\n")
-    print(f"❌ {error_message}")
+# Configure loggers
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+avail_logger = logging.getLogger("availability")
+avail_handler = logging.FileHandler(AVAIL_LOG_FILE)
+avail_handler.setFormatter(logging.Formatter('[%(asctime)s] %(message)s', '%Y-%m-%d %H:%M:%S'))
+avail_logger.addHandler(avail_handler)
+avail_logger.propagate = False
+
+error_logger = logging.getLogger("errors")
+error_handler = logging.FileHandler(ERROR_LOG_FILE)
+error_handler.setFormatter(logging.Formatter('[%(asctime)s] %(message)s', '%Y-%m-%d %H:%M:%S'))
+error_logger.addHandler(error_handler)
+error_logger.propagate = False
+
+# To filter duplicate log lines in a single run
+seen_messages = set()
+def log_avail(msg):
+    if msg not in seen_messages:
+        avail_logger.info(msg)
+        print(msg)
+        seen_messages.add(msg)
+
+def log_error(msg):
+    error_logger.error(msg)
+    print(f"❌ {msg}")
 
 # ==============================
 # Huts Configuration
@@ -92,7 +112,7 @@ def scrape_calendar(url, room_name="Default", max_retries=3):
             EC.presence_of_element_located((By.CSS_SELECTOR, "[data-app-calendar-month-day]"))
         )
     except:
-        log_scraper(f"⚠️ Calendar not loaded for {room_name}")
+        log_avail(f"⚠️ Calendar not loaded for {room_name}")
         driver.quit()
         return []
 
@@ -112,11 +132,11 @@ def scrape_calendar(url, room_name="Default", max_retries=3):
                     classes = day_div.get_attribute("class")
                     if "has-availability" in classes:
                         available_dates.append((date_str, room_name))
-                        log_scraper(f"✅ {room_name} {date_str} available")
+                        log_avail(f"✅ {room_name} {date_str} available")
                 except StaleElementReferenceException:
                     continue
                 except Exception as e:
-                    log_scraper(f"⚠️ Error reading day {date_str} for {room_name}: {e}")
+                    log_avail(f"⚠️ Error reading day {date_str} for {room_name}: {e}")
 
             month_text = driver.find_element(By.CSS_SELECTOR, ".month-title-text").text.strip()
             if month_text in seen_months:
@@ -136,7 +156,7 @@ def scrape_calendar(url, room_name="Default", max_retries=3):
                 time.sleep(1)
                 continue
             else:
-                log_scraper(f"⚠️ Too many stale element errors for {room_name}")
+                log_avail(f"⚠️ Too many stale element errors for {room_name}")
                 break
 
     driver.quit()
@@ -161,7 +181,7 @@ def send_email(to_email: str, availability_dict):
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(EMAIL_FROM, EMAIL_PASS)
         server.send_message(msg)
-        log_scraper(f"✅ Email sent to {to_email}")
+        log_avail(f"✅ Email sent to {to_email}")
 
 # ==============================
 # Main
@@ -173,15 +193,15 @@ def main():
     cur = conn.cursor()
     cur.execute("SELECT email, hut, start_date, end_date FROM subscriptions")
     subs = cur.fetchall()
-    log_scraper(f"🔍 Found {len(subs)} subscriptions")
+    log_avail(f"🔍 Found {len(subs)} subscriptions")
 
     for email, hut_key, start_date, end_date in subs:
         if hut_key not in HUTS:
-            log_scraper(f"⚠️ Hut '{hut_key}' not configured, skipping {email}")
+            log_avail(f"⚠️ Hut '{hut_key}' not configured, skipping {email}")
             continue
 
         availability_dict = {}
-        log_scraper(f"➡️ Checking availability for {email} (hut: {hut_key})")
+        log_avail(f"➡️ Checking availability for {email} (hut: {hut_key})")
 
         for room_name, url in HUTS[hut_key]:
             dates = scrape_calendar(url, room_name)
@@ -193,7 +213,7 @@ def main():
                     date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
                     parsed_dates.append((date_obj, room))
                 except Exception as e:
-                    log_scraper(f"⚠️ Failed to parse date {date_str} for {room_name}: {e}")
+                    log_avail(f"⚠️ Failed to parse date {date_str} for {room_name}: {e}")
 
             # Filter by user date range
             filtered_dates = [d for d in parsed_dates if start_date <= d[0] <= end_date]
@@ -204,7 +224,7 @@ def main():
         if availability_dict:
             send_email(email, availability_dict)
         else:
-            log_scraper(f"❌ No availability for {email}")
+            log_avail(f"❌ No availability for {email}")
 
     cur.close()
     conn.close()
@@ -220,4 +240,4 @@ if __name__ == "__main__":
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        log_crash(error_details)
+        log_error(error_details)
