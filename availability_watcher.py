@@ -1,7 +1,6 @@
-import os 
-import uuid
+import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import psycopg2
 import smtplib
 from email.mime.text import MIMEText
@@ -42,15 +41,11 @@ for f in [AVAIL_LOG_FILE, ERROR_LOG_FILE]:
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 avail_logger = logging.getLogger("availability")
-avail_handler = logging.FileHandler(AVAIL_LOG_FILE)
-avail_handler.setFormatter(logging.Formatter('[%(asctime)s] %(message)s', '%Y-%m-%d %H:%M:%S'))
-avail_logger.addHandler(avail_handler)
+avail_logger.addHandler(logging.FileHandler(AVAIL_LOG_FILE))
 avail_logger.propagate = False
 
 error_logger = logging.getLogger("errors")
-error_handler = logging.FileHandler(ERROR_LOG_FILE)
-error_handler.setFormatter(logging.Formatter('[%(asctime)s] %(message)s', '%Y-%m-%d %H:%M:%S'))
-error_logger.addHandler(error_handler)
+error_logger.addHandler(logging.FileHandler(ERROR_LOG_FILE))
 error_logger.propagate = False
 
 seen_messages = set()
@@ -167,19 +162,19 @@ def get_db_connection():
 def has_been_notified(user_email, hut_name, date):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT 1 FROM notified_availability
-                WHERE user_email=%s AND hut_name=%s AND date=%s LIMIT 1
-            """, (user_email, hut_name, date))
+            cur.execute(
+                "SELECT 1 FROM notified_availability WHERE user_email=%s AND hut_name=%s AND date=%s LIMIT 1",
+                (user_email, hut_name, date)
+            )
             return cur.fetchone() is not None
 
 def mark_as_notified(user_email, hut_name, date):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO notified_availability (user_email, hut_name, date)
-                VALUES (%s, %s, %s)
-            """, (user_email, hut_name, date))
+            cur.execute(
+                "INSERT INTO notified_availability (user_email, hut_name, date) VALUES (%s, %s, %s)",
+                (user_email, hut_name, date)
+            )
         conn.commit()
 
 def get_subscriptions():
@@ -189,21 +184,39 @@ def get_subscriptions():
             return cur.fetchall()
 
 # ==============================
-# Send email with direct booking links
+# Send email with conditional room grouping
 # ==============================
-def send_email(to_email, hut_name, date):
+def send_email(to_email, hut_name, available_list):
     try:
-        # Build email body with hut URL
-        url = next((link for r_name, link in HUTS[hut_name] if r_name == hut_name), "")
+        lines = []
+        multiple_rooms = len(HUTS[hut_name]) > 1
+
+        if multiple_rooms:
+            # Group by room
+            room_dict = {}
+            for date_obj, room, url in available_list:
+                room_dict.setdefault(room, []).append((date_obj, url))
+            for room, dates_urls in room_dict.items():
+                lines.append(f"{room}:")
+                for date_obj, url in sorted(dates_urls):
+                    lines.append(f"- {date_obj}: {url}")
+                lines.append("")  # Blank line between rooms
+        else:
+            # Single-room hut
+            for date_obj, room, url in sorted(available_list):
+                lines.append(f"- {date_obj}: {url}")
+
         body = f"""Dear climber,
 
-Good news! A spot has just opened for you at {hut_name} on {date}.
-Secure your spot immediately using this booking link: {url}
+Good news! A spot has just opened for you at {hut_name}.
+
+{chr(10).join(lines)}
 
 Best regards,
 Mount Fuji Hut Alert"""
+
         msg = MIMEText(body)
-        msg["Subject"] = f"⛺ Fuji Hut Availability Alert: {hut_name} on {date}"
+        msg["Subject"] = f"⛺ Fuji Hut Availability Alert: {hut_name}"
         msg["From"] = EMAIL_FROM
         msg["To"] = to_email
 
@@ -211,7 +224,7 @@ Mount Fuji Hut Alert"""
             server.login(EMAIL_FROM, EMAIL_PASS)
             server.send_message(msg)
 
-        log_avail(f"📧 Email sent to {to_email} for {hut_name} on {date}")
+        log_avail(f"📧 Email sent to {to_email} for {hut_name}")
     except Exception as e:
         log_error(f"Failed to send email to {to_email}: {e}")
 
@@ -228,20 +241,23 @@ def main():
                 continue
 
             log_avail(f"➡️ Checking availability for {email} ({hut_key})")
+            available_list = []
             for room_name, url in HUTS[hut_key]:
                 dates = scrape_calendar(url, room_name)
                 for date_str, room in dates:
                     try:
                         date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-                        # ✅ FIX: Make end_date exclusive so only the actual booked night triggers alert
-                        if start_date <= date_obj < end_date:
-                            if not has_been_notified(email, hut_key, date_obj):
-                                send_email(email, hut_key, date_obj)
-                                mark_as_notified(email, hut_key, date_obj)
-                            else:
-                                log_avail(f"Already notified {email} for {hut_key} on {date_obj}")
+                        # Only alert for the actual booked night
+                        if start_date <= date_obj < end_date and not has_been_notified(email, hut_key, date_obj):
+                            available_list.append((date_obj, room, url))
+                            mark_as_notified(email, hut_key, date_obj)
                     except Exception as e:
                         log_avail(f"⚠️ Failed to parse date {date_str} for {room_name}: {e}")
+
+            if available_list:
+                send_email(email, hut_key, available_list)
+            else:
+                log_avail(f"No new availability for {email} ({hut_key})")
     except Exception as e:
         import traceback
         log_error(traceback.format_exc())
