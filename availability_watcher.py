@@ -41,7 +41,6 @@ for f in [AVAIL_LOG_FILE, ERROR_LOG_FILE]:
     if os.path.exists(f):
         os.remove(f)
 
-# Configure loggers
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 avail_logger = logging.getLogger("availability")
 avail_handler = logging.FileHandler(AVAIL_LOG_FILE)
@@ -55,7 +54,6 @@ error_handler.setFormatter(logging.Formatter('[%(asctime)s] %(message)s', '%Y-%m
 error_logger.addHandler(error_handler)
 error_logger.propagate = False
 
-# To filter duplicate log lines in a single run
 seen_messages = set()
 def log_avail(msg):
     if msg not in seen_messages:
@@ -71,7 +69,7 @@ def log_error(msg):
 # Huts Configuration
 # ==============================
 HUTS = {
-    "taiyokan": [("Taiyokan Default", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/ZYLbB")],
+    "taiyokan": [("Taiyokan", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/ZYLbB")],
     "kamaiwakan": [
         ("Dormitory", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_ajabkj--2d5843d4-e181-468a-bf96-9a5a4bac08cd?mode=standalone"),
         ("Capsule", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_pr85x8--959b0b5d-02da-4b6b-880b-ce09023357eb?mode=standalone"),
@@ -80,12 +78,12 @@ HUTS = {
         ("Private Capsule Sunrise View", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_49repp--250aa6d9-0ed1-4e94-a4fc-1e97f0922fc2?mode=standalone"),
         ("Private Room", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_jxyq9z--e1645fb8-e20c-46d7-b23e-e4732cd663a6?mode=standalone")
     ],
-    "setokan": [("Setokan Default", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_9bn546--ce658958-2895-4b71-abec-6fb1d2097fc7?mode=standalone")],
-    "miharashikan": [("Miharashikan Default", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_y83bej--a732d212-bdb2-49c9-afee-3cb1a8b7c6b7?mode=standalone")],
-    "yamaguchiya": [("Yamaguchiya Default", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/dy9Me")],
-    "yoshinoya": [("Yoshinoya Default", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/l7Wve")],
-    "osada_sanso": [("Osada Sanso Default", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/rb3b4")],
-    "higashi_fuji_sanso": [("Higashi Fuji Sanso Default", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/8aMap")],
+    "setokan": [("Setokan", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_9bn546--ce658958-2895-4b71-abec-6fb1d2097fc7?mode=standalone")],
+    "miharashikan": [("Miharashikan", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/p_y83bej--a732d212-bdb2-49c9-afee-3cb1a8b7c6b7?mode=standalone")],
+    "yamaguchiya": [("Yamaguchiya", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/dy9Me")],
+    "yoshinoya": [("Yoshinoya", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/l7Wve")],
+    "osada_sanso": [("Osada Sanso", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/rb3b4")],
+    "higashi_fuji_sanso": [("Higashi Fuji Sanso", "https://book.peek.com/s/9846cbab-98f5-477d-b7d1-1ab5928778ff/8aMap")],
 }
 
 # ==============================
@@ -101,12 +99,11 @@ def create_driver():
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 # ==============================
-# Scrape full calendar for available dates (with retries)
+# Scrape calendar for available dates
 # ==============================
 def scrape_calendar(url, room_name="Default", max_retries=3):
     driver = create_driver()
     driver.get(url)
-    
     try:
         WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "[data-app-calendar-month-day]"))
@@ -163,81 +160,97 @@ def scrape_calendar(url, room_name="Default", max_retries=3):
     return available_dates
 
 # ==============================
-# Send aggregated email
+# Database helpers for notified availability
 # ==============================
-def send_email(to_email: str, availability_dict):
-    subject = "⛺ Mount Fuji Hut Availability Alert"
-    body = "Hello,\n\nThe following dates are now available:\n\n"
-    for hut_key, dates in availability_dict.items():
-        body += f"{hut_key.replace('_', ' ').title()}:\n"
-        for date, room in dates:
-            body += f"  - {date}: {room}\n"
-    body += "\nBook ASAP!"
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_FROM
-    msg["To"] = to_email
+def get_db_connection():
+    return psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST)
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(EMAIL_FROM, EMAIL_PASS)
-        server.send_message(msg)
-        log_avail(f"✅ Email sent to {to_email}")
+def has_been_notified(user_email, hut_name, date):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 1 FROM notified_availability
+                WHERE user_email=%s AND hut_name=%s AND date=%s LIMIT 1
+            """, (user_email, hut_name, date))
+            return cur.fetchone() is not None
+
+def mark_as_notified(user_email, hut_name, date):
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO notified_availability (user_email, hut_name, date)
+                VALUES (%s, %s, %s)
+            """, (user_email, hut_name, date))
+        conn.commit()
+
+def get_subscriptions():
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT email, hut, start_date, end_date FROM subscriptions")
+            return cur.fetchall()
 
 # ==============================
-# Main
+# Send email for new availability
+# ==============================
+def send_email(to_email, hut_name, date):
+    try:
+        msg = MIMEText(f"Good news!\n\nAvailability detected for {hut_name} on {date}.\nBook now to secure your spot!")
+        msg["Subject"] = f"Availability Alert: {hut_name} on {date}"
+        msg["From"] = EMAIL_FROM
+        msg["To"] = to_email
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(EMAIL_FROM, EMAIL_PASS)
+            server.send_message(msg)
+
+        log_avail(f"📧 Email sent to {to_email} for {hut_name} on {date}")
+    except Exception as e:
+        log_error(f"Failed to send email to {to_email}: {e}")
+
+# ==============================
+# Main runner
 # ==============================
 def main():
-    conn = psycopg2.connect(
-        dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, sslmode="require"
-    )
-    cur = conn.cursor()
-    cur.execute("SELECT email, hut, start_date, end_date FROM subscriptions")
-    subs = cur.fetchall()
-    log_avail(f"🔍 Found {len(subs)} subscriptions")
+    log_avail(f"=== Availability Check started at {datetime.now()} ===")
+    try:
+        subscriptions = get_subscriptions()
+        for email, hut_key, start_date, end_date in subscriptions:
+            if hut_key not in HUTS:
+                log_avail(f"⚠️ Hut '{hut_key}' not configured, skipping {email}")
+                continue
 
-    for email, hut_key, start_date, end_date in subs:
-        if hut_key not in HUTS:
-            log_avail(f"⚠️ Hut '{hut_key}' not configured, skipping {email}")
-            continue
+            log_avail(f"➡️ Checking availability for {email} ({hut_key})")
+            availability_dict = {}
+            for room_name, url in HUTS[hut_key]:
+                dates = scrape_calendar(url, room_name)
+                parsed_dates = []
+                for date_str, room in dates:
+                    try:
+                        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                        if start_date <= date_obj <= end_date:
+                            parsed_dates.append((date_obj, room))
+                    except Exception as e:
+                        log_avail(f"⚠️ Failed to parse date {date_str} for {room_name}: {e}")
 
-        availability_dict = {}
-        log_avail(f"➡️ Checking availability for {email} (hut: {hut_key})")
+                # Send email only for new availability
+                for date_obj, room in parsed_dates:
+                    if not has_been_notified(email, hut_key, date_obj):
+                        send_email(email, hut_key, date_obj)
+                        mark_as_notified(email, hut_key, date_obj)
+                    else:
+                        log_avail(f"Already notified {email} for {hut_key} on {date_obj}")
 
-        for room_name, url in HUTS[hut_key]:
-            dates = scrape_calendar(url, room_name)
-
-            # Convert scraped string dates to datetime.date
-            parsed_dates = []
-            for date_str, room in dates:
-                try:
-                    date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-                    parsed_dates.append((date_obj, room))
-                except Exception as e:
-                    log_avail(f"⚠️ Failed to parse date {date_str} for {room_name}: {e}")
-
-            # Filter by user date range
-            filtered_dates = [d for d in parsed_dates if start_date <= d[0] <= end_date]
-
-            if filtered_dates:
-                availability_dict.setdefault(hut_key, []).extend(filtered_dates)
-
-        if availability_dict:
-            send_email(email, availability_dict)
-        else:
-            log_avail(f"❌ No availability for {email}")
-
-    cur.close()
-    conn.close()
+    except Exception as e:
+        import traceback
+        log_error(traceback.format_exc())
+    log_avail(f"=== Availability Check finished at {datetime.now()} ===")
 
 # ==============================
-# Run main with crash logging
+# Run script
 # ==============================
-SESSION_REFID = str(uuid.uuid4())
-
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
         import traceback
-        error_details = traceback.format_exc()
-        log_error(error_details)
+        log_error(traceback.format_exc())
