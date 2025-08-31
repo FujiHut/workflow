@@ -208,15 +208,15 @@ def send_email(to_email, hut_name, available_list):
 
         body = f"""Dear climber,
 
-Good news! A spot has just opened for you at {hut_name}.
+Good news! A spot has just opened for you at {hut_name}. Secure your spot immediately using the booking link below.
 
 {chr(10).join(lines)}
 
 Best regards,
-Mount Fuji Hut Alert"""
+Mount Fuji Hut Alerts"""
 
         msg = MIMEText(body)
-        msg["Subject"] = f"⛺ Fuji Hut Availability Alert: {hut_name}"
+        msg["Subject"] = f"⛺ Mount Fuji Hut Availability Alert"
         msg["From"] = EMAIL_FROM
         msg["To"] = to_email
 
